@@ -40,5 +40,5 @@ images:
 options:
   logging: CLOUD_LOGGING_ONLY
 substitutions:
-  _REGION: 'us-central1' # Change to your preferred region
-  _ARTIFACT_REGISTRY_REPO: 'cloud-functions-repo' # Name for your Artifact Registry repo
+  _REGION: 'us-east5'
+  _ARTIFACT_REGISTRY_REPO: 'cleanup-functions-repo' # UPDATED: Changed to a more specific name

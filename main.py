@@ -13,7 +13,7 @@ firebase_admin.initialize_app()
 def cleanup_firestore(event, context):
     """
     Cloud Function entry point. Triggered by Cloud Scheduler.
-    Cleans up old activeUsers and messages in Firestore.
+    Cleans up old activeUsers, updates the count, and deletes old messages.
     """
     print("Starting Firestore cleanup job...")
     db = firestore.client()
@@ -21,7 +21,7 @@ def cleanup_firestore(event, context):
     # Get the current time (UTC for consistent comparison)
     now = datetime.datetime.now(datetime.timezone.utc)
 
-    # --- 1. Clean up activeUsers ---
+    # --- 1. Clean up activeUsers and update count ---
     # Set the time threshold: 10 minutes ago
     active_user_threshold = now - datetime.timedelta(minutes=10)
 
@@ -31,6 +31,7 @@ def cleanup_firestore(event, context):
         spaces_ref = db.collection('Spaces')
         for space in spaces_ref.stream():
             space_id = space.id
+            space_ref = space.reference  # Get a reference to the main space document
             print(f"Processing space: {space_id}")
 
             active_users_ref = space.reference.collection('activeUsers')
@@ -52,8 +53,20 @@ def cleanup_firestore(event, context):
             else:
                 print(f"  - No old activeUsers to delete in space: {space_id}")
 
+            # --- NEW: Count remaining users and update the space document ---
+            # Stream the documents again to get an accurate live count.
+            remaining_users_stream = active_users_ref.stream()
+            # This is an efficient way to count all items in an iterator
+            remaining_user_count = sum(1 for _ in remaining_users_stream)
+
+            print(f"  - Found {remaining_user_count} remaining active user(s).")
+
+            # Update the currentUserCount field on the parent space document
+            space_ref.update({'currentUserCount': remaining_user_count})
+            print(f"  - Updated 'currentUserCount' to {remaining_user_count} for space: {space_id}")
+
     except Exception as e:
-        print(f"Error during activeUsers cleanup: {e}")
+        print(f"Error during activeUsers cleanup and count update: {e}")
 
     # --- 2. Clean up old messages ---
     # Set the time threshold: 24 hours ago
