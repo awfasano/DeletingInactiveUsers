@@ -9,14 +9,21 @@ from firebase_admin import firestore
 # in the Cloud Functions environment.
 firebase_admin.initialize_app()
 
+# Get the database ID from an environment variable set during deployment.
+# Fallback to '(default)' if not set, for local testing purposes.
+DATABASE_ID = os.environ.get('DATABASE_ID', '(default)')
+
 
 def cleanup_firestore(event, context):
     """
     Cloud Function entry point. Triggered by Cloud Scheduler.
-    Cleans up old activeUsers, updates the count, and deletes old messages.
+    Cleans up old activeUsers, updates the count, and deletes old messages
+    in the specified Firestore database.
     """
-    print("Starting Firestore cleanup job...")
-    db = firestore.client()
+    print(f"Starting Firestore cleanup job for database: '{DATABASE_ID}'...")
+
+    # Connect to the specified Firestore database
+    db = firestore.client(database=DATABASE_ID)
 
     # Get the current time (UTC for consistent comparison)
     now = datetime.datetime.now(datetime.timezone.utc)
