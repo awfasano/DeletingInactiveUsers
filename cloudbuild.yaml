@@ -1,0 +1,44 @@
+steps:
+  # 1. Build the container image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REGISTRY_REPO}/firestore-cleanup-function:$COMMIT_SHA'
+      - '.'
+    id: 'Build Image'
+
+  # 2. Push the container image to Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REGISTRY_REPO}/firestore-cleanup-function:$COMMIT_SHA'
+    id: 'Push Image'
+
+  # 3. Deploy to Cloud Functions (2nd Gen)
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'functions'
+      - 'deploy'
+      - 'firestore-cleanup-function' # Name of your Cloud Function
+      - '--gen2'
+      - '--region=${_REGION}'
+      - '--image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REGISTRY_REPO}/firestore-cleanup-function:$COMMIT_SHA'
+      - '--entry-point=cleanup_firestore'
+      # This sets up the schedule to run at the top of every hour.
+      - '--trigger-schedule=0 * * * *'
+      - '--trigger-location=${_REGION}'
+      - '--schedule-timezone=Etc/UTC' # Use UTC for consistency
+    id: 'Deploy Function'
+
+# Define the images to be pushed to Artifact Registry
+images:
+  - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REGISTRY_REPO}/firestore-cleanup-function:$COMMIT_SHA'
+
+# Define substitutions that can be passed in from the trigger
+options:
+  logging: CLOUD_LOGGING_ONLY
+substitutions:
+  _REGION: 'us-central1' # Change to your preferred region
+  _ARTIFACT_REGISTRY_REPO: 'cloud-functions-repo' # Name for your Artifact Registry repo
