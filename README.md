@@ -16,7 +16,7 @@ main.py: The Python source code for the Cloud Function. It contains all the logi
 
 requirements.txt: A list of Python dependencies required to run the function (firebase-admin and functions-framework).
 
-Dockerfile: Defines the container environment for the function. It sets up a Python environment, installs dependencies, and copies the source code.
+Dockerfile: Defines the container environment for the function.  It sets up a Python environment, installs dependencies, and copies the source code.
 
 cloudbuild.yaml: The configuration file for Cloud Build. It defines a CI/CD pipeline that builds the Docker image, pushes it to Artifact Registry, and deploys it as a 2nd Gen Cloud Function with a schedule.
 

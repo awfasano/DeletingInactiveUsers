@@ -108,3 +108,4 @@ substitutions:
   _SCHEDULER_REGION: 'us-east4' # Valid region for Cloud Scheduler
   _ARTIFACT_REGISTRY_REPO: 'cleanup-functions-repo'
   _SERVICE_ACCOUNT: '457201302256-compute@developer.gserviceaccount.com'
+
