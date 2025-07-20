@@ -15,7 +15,7 @@ steps:
       - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REGISTRY_REPO}/firestore-cleanup-service:$COMMIT_SHA'
     id: 'Push Image'
 
-  # 3. Deploy to Cloud Run
+  # 3. Deploy to Cloud Run (requiring authentication)
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args:
@@ -25,14 +25,28 @@ steps:
       - '--image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REGISTRY_REPO}/firestore-cleanup-service:$COMMIT_SHA'
       - '--region=${_REGION}'
       - '--platform=managed'
-      - '--allow-unauthenticated' # Remove this if you want to require authentication
+      - '--no-allow-unauthenticated'  # Require authentication
       - '--set-env-vars=DATABASE_ID=uploads'
       - '--memory=512Mi'
-      - '--timeout=540' # 9 minutes timeout
+      - '--timeout=540'  # 9 minutes timeout
       - '--max-instances=10'
+      - '--service-account=457201302256-compute@developer.gserviceaccount.com'  # Explicitly set service account
     id: 'Deploy to Cloud Run'
 
-  # 4. Create Cloud Scheduler job to trigger the service
+  # 4. Grant Cloud Run Invoker permission to the service account
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'services'
+      - 'add-iam-policy-binding'
+      - 'firestore-cleanup-service'
+      - '--member=serviceAccount:457201302256-compute@developer.gserviceaccount.com'
+      - '--role=roles/run.invoker'
+      - '--region=${_REGION}'
+    id: 'Grant Invoker Permission'
+
+  # 5. Create or update Cloud Scheduler job with authentication
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: bash
     args:
@@ -44,15 +58,33 @@ steps:
         # Delete existing job if it exists (ignore errors)
         gcloud scheduler jobs delete firestore-cleanup-job --location=${_REGION} --quiet || true
         
-        # Create a new Cloud Scheduler job
+        # Create a new Cloud Scheduler job with authentication
         gcloud scheduler jobs create http firestore-cleanup-job \
           --location=${_REGION} \
           --schedule="0 * * * *" \
-          --uri="$${SERVICE_URL}/" \
+          --uri="${SERVICE_URL}/" \
           --http-method=POST \
+          --oidc-service-account-email="457201302256-compute@developer.gserviceaccount.com" \
+          --oidc-token-audience="${SERVICE_URL}" \
           --time-zone="Etc/UTC" \
-          --attempt-deadline="540s"
+          --attempt-deadline="540s" \
+          --description="Hourly cleanup of Firestore inactive users and old messages"
+        
+        echo "Cloud Scheduler job created successfully"
+        echo "Service URL: ${SERVICE_URL}"
+        echo "Next run will be at the top of the next hour"
     id: 'Create Scheduler Job'
+
+  # 6. Test the deployment by running the scheduler job once
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: bash
+    args:
+      - '-c'
+      - |
+        echo "Testing the scheduler job..."
+        gcloud scheduler jobs run firestore-cleanup-job --location=${_REGION}
+        echo "Test run initiated. Check Cloud Run logs for results."
+    id: 'Test Scheduler Job'
 
 # Define the images to be pushed to Artifact Registry
 images:
@@ -61,6 +93,7 @@ images:
 # Define substitutions that can be passed in from the trigger
 options:
   logging: CLOUD_LOGGING_ONLY
+  machineType: 'E2_HIGHCPU_8'  # Use a faster machine for builds
 substitutions:
   _REGION: 'us-east5'
   _ARTIFACT_REGISTRY_REPO: 'cleanup-functions-repo'
