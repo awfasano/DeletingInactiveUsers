@@ -21,7 +21,7 @@ steps:
     args:
       - 'run'
       - 'deploy'
-      - 'firestore-cleanup-service'
+      - 'firestore-cleanup-service' # This should match the service name you want
       - '--image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REGISTRY_REPO}/firestore-cleanup-service:$COMMIT_SHA'
       - '--region=${_REGION}'
       - '--platform=managed'
@@ -34,19 +34,21 @@ steps:
     id: 'Deploy to Cloud Run'
 
   # 4. Grant Cloud Run Invoker permission to the service account
+  # This allows the service account to invoke the Cloud Run service.
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args:
       - 'run'
       - 'services'
       - 'add-iam-policy-binding'
-      - 'firestore-cleanup-service'
+      - 'firestore-cleanup-service' # This should match the service name
       - '--member=serviceAccount:${_SERVICE_ACCOUNT}'
       - '--role=roles/run.invoker'
       - '--region=${_REGION}'
     id: 'Grant Invoker Permission'
 
   # 5. Create or update Cloud Scheduler job with authentication
+  # This step now uses a separate region for the scheduler.
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: bash
     args:
@@ -55,9 +57,9 @@ steps:
         # Get the Cloud Run service URL
         SERVICE_URL=$(gcloud run services describe firestore-cleanup-service --region=${_REGION} --format='value(status.url)')
 
-        # Update existing job or create a new one
+        # Try to update the job; if it fails (because it doesn't exist), create it.
         gcloud scheduler jobs update http firestore-cleanup-job \
-          --location=${_REGION} \
+          --location=${_SCHEDULER_REGION} \
           --schedule="0 * * * *" \
           --uri="${SERVICE_URL}/" \
           --http-method=POST \
@@ -68,7 +70,7 @@ steps:
           --description="Hourly cleanup of Firestore inactive users and old messages" \
           --quiet || \
         gcloud scheduler jobs create http firestore-cleanup-job \
-          --location=${_REGION} \
+          --location=${_SCHEDULER_REGION} \
           --schedule="0 * * * *" \
           --uri="${SERVICE_URL}/" \
           --http-method=POST \
@@ -78,9 +80,8 @@ steps:
           --attempt-deadline="540s" \
           --description="Hourly cleanup of Firestore inactive users and old messages"
 
-        echo "Cloud Scheduler job created/updated successfully"
+        echo "Cloud Scheduler job created/updated successfully in ${_SCHEDULER_REGION}"
         echo "Service URL: ${SERVICE_URL}"
-        echo "Next run will be at the top of the next hour"
     id: 'Create or Update Scheduler Job'
 
   # 6. Test the deployment by running the scheduler job once
@@ -89,8 +90,8 @@ steps:
     args:
       - '-c'
       - |
-        echo "Testing the scheduler job..."
-        gcloud scheduler jobs run firestore-cleanup-job --location=${_REGION}
+        echo "Testing the scheduler job from location ${_SCHEDULER_REGION}..."
+        gcloud scheduler jobs run firestore-cleanup-job --location=${_SCHEDULER_REGION}
         echo "Test run initiated. Check Cloud Run logs for results."
     id: 'Test Scheduler Job'
 
@@ -104,5 +105,6 @@ options:
   machineType: 'E2_HIGHCPU_8'
 substitutions:
   _REGION: 'us-east5'
+  _SCHEDULER_REGION: 'us-east4' # Valid region for Cloud Scheduler
   _ARTIFACT_REGISTRY_REPO: 'cleanup-functions-repo'
   _SERVICE_ACCOUNT: '457201302256-compute@developer.gserviceaccount.com'
