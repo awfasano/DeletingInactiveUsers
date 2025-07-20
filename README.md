@@ -14,7 +14,7 @@ The repository contains the following files:
 
 main.py: The Python source code for the Cloud Function. It contains all the logic for connecting to Firestore and performing the cleanup operations.
 
-requirements.txt: A list of Python dependencies required to run the function (firebase-admin and functions-framework).
+requirements.txt: A list of Python dependencies  required to run the function (firebase-admin and functions-framework).
 
 Dockerfile: Defines the container environment for the function.  It sets up a Python environment, installs dependencies, and copies the source code.
 
