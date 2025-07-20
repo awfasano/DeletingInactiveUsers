@@ -4,7 +4,7 @@ steps:
     args:
       - 'build'
       - '-t'
-      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REGISTRY_REPO}/firestore-cleanup-service:$COMMIT_SHA'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REGISTRY_REPO}/cleanup:$COMMIT_SHA'
       - '.'
     id: 'Build Image'
 
@@ -12,7 +12,7 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'push'
-      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REGISTRY_REPO}/firestore-cleanup-service:$COMMIT_SHA'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REGISTRY_REPO}/cleanup:$COMMIT_SHA'
     id: 'Push Image'
 
   # 3. Deploy to Cloud Run (requiring authentication)
@@ -21,8 +21,8 @@ steps:
     args:
       - 'run'
       - 'deploy'
-      - 'firestore-cleanup-service' # This should match the service name you want
-      - '--image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REGISTRY_REPO}/firestore-cleanup-service:$COMMIT_SHA'
+      - 'cleanup' # Service name now matches your deployment
+      - '--image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REGISTRY_REPO}/cleanup:$COMMIT_SHA'
       - '--region=${_REGION}'
       - '--platform=managed'
       - '--no-allow-unauthenticated'  # Require authentication
@@ -41,7 +41,7 @@ steps:
       - 'run'
       - 'services'
       - 'add-iam-policy-binding'
-      - 'firestore-cleanup-service' # This should match the service name
+      - 'cleanup' # Service name now matches your deployment
       - '--member=serviceAccount:${_SERVICE_ACCOUNT}'
       - '--role=roles/run.invoker'
       - '--region=${_REGION}'
@@ -55,7 +55,7 @@ steps:
       - '-c'
       - |
         # Get the Cloud Run service URL
-        SERVICE_URL=$(gcloud run services describe firestore-cleanup-service --region=${_REGION} --format='value(status.url)')
+        SERVICE_URL=$(gcloud run services describe cleanup --region=${_REGION} --format='value(status.url)')
 
         # Try to update the job; if it fails (because it doesn't exist), create it.
         gcloud scheduler jobs update http firestore-cleanup-job \
@@ -97,7 +97,7 @@ steps:
 
 # Define the images to be pushed to Artifact Registry
 images:
-  - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REGISTRY_REPO}/firestore-cleanup-service:$COMMIT_SHA'
+  - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REGISTRY_REPO}/cleanup:$COMMIT_SHA'
 
 # Define substitutions that can be passed in from the trigger
 options:
