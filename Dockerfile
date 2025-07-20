@@ -8,14 +8,13 @@ WORKDIR /app
 COPY requirements.txt .
 
 # Install any needed packages specified in requirements.txt
-# --no-cache-dir: Disables the cache which is not needed for production images
-# --require-hashes: Ensures dependencies are the ones you expect
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the rest of the application's code into the container
 COPY . .
 
-# The CMD instruction specifies the command to run when the container starts.
-# We use the Functions Framework to serve the function.
-# The --target flag specifies the name of the function in main.py to execute.
-CMD ["functions-framework", "--target=cleanup_firestore"]
+# Expose port 8080
+EXPOSE 8080
+
+# Use gunicorn to serve the Flask app
+CMD exec gunicorn --bind :$PORT --workers 1 --threads 8 --timeout 0 main:app

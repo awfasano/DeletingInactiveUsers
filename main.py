@@ -1,22 +1,23 @@
 import os
 import datetime
+from flask import Flask, request
 from google.cloud import firestore
 import firebase_admin
 from firebase_admin import firestore
 
 # Initialize Firebase Admin SDK
-# The SDK will automatically use the default service account credentials
-# in the Cloud Functions environment.
 firebase_admin.initialize_app()
 
-# Get the database ID from an environment variable set during deployment.
-# Fallback to '(default)' if not set, for local testing purposes.
+# Get the database ID from an environment variable
 DATABASE_ID = os.environ.get('DATABASE_ID', '(default)')
 
+# Create Flask app for HTTP endpoints
+app = Flask(__name__)
 
-def cleanup_firestore(event, context):
+@app.route('/', methods=['GET', 'POST'])
+def cleanup_firestore():
     """
-    Cloud Function entry point. Triggered by Cloud Scheduler.
+    HTTP endpoint for Cloud Run. Can be triggered by Cloud Scheduler.
     Cleans up old activeUsers, updates the count, and deletes old messages
     in the specified Firestore database.
     """
@@ -38,7 +39,7 @@ def cleanup_firestore(event, context):
         spaces_ref = db.collection('Spaces')
         for space in spaces_ref.stream():
             space_id = space.id
-            space_ref = space.reference  # Get a reference to the main space document
+            space_ref = space.reference
             print(f"Processing space: {space_id}")
 
             active_users_ref = space.reference.collection('activeUsers')
@@ -109,3 +110,6 @@ def cleanup_firestore(event, context):
 
     print("\nFirestore cleanup job finished.")
     return 'OK', 200
+
+if __name__ == "__main__":
+    app.run(debug=True, host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))

@@ -4,7 +4,7 @@ steps:
     args:
       - 'build'
       - '-t'
-      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REGISTRY_REPO}/firestore-cleanup-function:$COMMIT_SHA'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REGISTRY_REPO}/firestore-cleanup-service:$COMMIT_SHA'
       - '.'
     id: 'Build Image'
 
@@ -12,31 +12,51 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'push'
-      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REGISTRY_REPO}/firestore-cleanup-function:$COMMIT_SHA'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REGISTRY_REPO}/firestore-cleanup-service:$COMMIT_SHA'
     id: 'Push Image'
 
-  # 3. Deploy to Cloud Functions (2nd Gen)
+  # 3. Deploy to Cloud Run
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args:
-      - 'functions'
+      - 'run'
       - 'deploy'
-      - 'firestore-cleanup-function' # Name of your Cloud Function
-      - '--gen2'
+      - 'firestore-cleanup-service'
+      - '--image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REGISTRY_REPO}/firestore-cleanup-service:$COMMIT_SHA'
       - '--region=${_REGION}'
-      - '--image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REGISTRY_REPO}/firestore-cleanup-function:$COMMIT_SHA'
-      - '--entry-point=cleanup_firestore'
-      # This sets up the schedule to run at the top of every hour.
-      - '--trigger-schedule=0 * * * *'
-      - '--trigger-location=${_REGION}'
-      - '--schedule-timezone=Etc/UTC' # Use UTC for consistency
-      # Set an environment variable to specify the target database
+      - '--platform=managed'
+      - '--allow-unauthenticated' # Remove this if you want to require authentication
       - '--set-env-vars=DATABASE_ID=uploads'
-    id: 'Deploy Function'
+      - '--memory=512Mi'
+      - '--timeout=540' # 9 minutes timeout
+      - '--max-instances=10'
+    id: 'Deploy to Cloud Run'
+
+  # 4. Create Cloud Scheduler job to trigger the service
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: bash
+    args:
+      - '-c'
+      - |
+        # Get the Cloud Run service URL
+        SERVICE_URL=$(gcloud run services describe firestore-cleanup-service --region=${_REGION} --format='value(status.url)')
+        
+        # Delete existing job if it exists (ignore errors)
+        gcloud scheduler jobs delete firestore-cleanup-job --location=${_REGION} --quiet || true
+        
+        # Create a new Cloud Scheduler job
+        gcloud scheduler jobs create http firestore-cleanup-job \
+          --location=${_REGION} \
+          --schedule="0 * * * *" \
+          --uri="$${SERVICE_URL}/" \
+          --http-method=POST \
+          --time-zone="Etc/UTC" \
+          --attempt-deadline="540s"
+    id: 'Create Scheduler Job'
 
 # Define the images to be pushed to Artifact Registry
 images:
-  - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REGISTRY_REPO}/firestore-cleanup-function:$COMMIT_SHA'
+  - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REGISTRY_REPO}/firestore-cleanup-service:$COMMIT_SHA'
 
 # Define substitutions that can be passed in from the trigger
 options:
