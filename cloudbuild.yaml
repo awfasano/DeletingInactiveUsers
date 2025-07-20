@@ -30,8 +30,8 @@ steps:
       - '--trigger-schedule=0 * * * *'
       - '--trigger-location=${_REGION}'
       - '--schedule-timezone=Etc/UTC' # Use UTC for consistency
-      # Set the database ID as an environment variable for the function
-      - '--set-env-vars=DATABASE_ID=${_DATABASE_ID}'
+      # Set an environment variable to specify the target database
+      - '--set-env-vars=DATABASE_ID=uploads'
     id: 'Deploy Function'
 
 # Define the images to be pushed to Artifact Registry
@@ -43,6 +43,4 @@ options:
   logging: CLOUD_LOGGING_ONLY
 substitutions:
   _REGION: 'us-east5'
-  _ARTIFACT_REGISTRY_REPO: 'gemini-apps' # Using the repo name from your other project
-  # The ID of the Firestore database to connect to.
-  _DATABASE_ID: 'uploads'
+  _ARTIFACT_REGISTRY_REPO: 'cleanup-functions-repo'

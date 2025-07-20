@@ -60,10 +60,8 @@ def cleanup_firestore(event, context):
             else:
                 print(f"  - No old activeUsers to delete in space: {space_id}")
 
-            # --- NEW: Count remaining users and update the space document ---
-            # Stream the documents again to get an accurate live count.
+            # Count remaining users and update the space document
             remaining_users_stream = active_users_ref.stream()
-            # This is an efficient way to count all items in an iterator
             remaining_user_count = sum(1 for _ in remaining_users_stream)
 
             print(f"  - Found {remaining_user_count} remaining active user(s).")
