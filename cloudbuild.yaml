@@ -61,10 +61,10 @@ steps:
         gcloud scheduler jobs update http firestore-cleanup-job \
           --location=${_SCHEDULER_REGION} \
           --schedule="0 * * * *" \
-          --uri="${SERVICE_URL}/" \
+          --uri="$${SERVICE_URL}/" \
           --http-method=POST \
           --oidc-service-account-email="${_SERVICE_ACCOUNT}" \
-          --oidc-token-audience="${SERVICE_URL}" \
+          --oidc-token-audience="$${SERVICE_URL}" \
           --time-zone="Etc/UTC" \
           --attempt-deadline="540s" \
           --description="Hourly cleanup of Firestore inactive users and old messages" \
@@ -72,16 +72,16 @@ steps:
         gcloud scheduler jobs create http firestore-cleanup-job \
           --location=${_SCHEDULER_REGION} \
           --schedule="0 * * * *" \
-          --uri="${SERVICE_URL}/" \
+          --uri="$${SERVICE_URL}/" \
           --http-method=POST \
           --oidc-service-account-email="${_SERVICE_ACCOUNT}" \
-          --oidc-token-audience="${SERVICE_URL}" \
+          --oidc-token-audience="$${SERVICE_URL}" \
           --time-zone="Etc/UTC" \
           --attempt-deadline="540s" \
           --description="Hourly cleanup of Firestore inactive users and old messages"
 
         echo "Cloud Scheduler job created/updated successfully in ${_SCHEDULER_REGION}"
-        echo "Service URL: ${SERVICE_URL}"
+        echo "Service URL: $${SERVICE_URL}"
     id: 'Create or Update Scheduler Job'
 
   # 6. Test the deployment by running the scheduler job once
